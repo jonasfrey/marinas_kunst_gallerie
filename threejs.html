@@ -1,0 +1,555 @@
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script type="module" src="https://cdn.space.unibe.ch/JsonToHtml.js"></script>
+
+<script src="https://cdn.space.unibe.ch/Fontawesome.js"></script>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css" />
+
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js" integrity="sha512-by6gRzSfA6HGshqED4Jnc6n/jJ9ojBvjbEbCvsrLzErlIiWswh1qYfYnvSzZg8SmbqVCk/v0XwlpGzJxIDPILw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
+
+<div id="app">
+    <canvas id="canvas"></canvas>
+</div>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        background: #333;
+        color: #eee;
+        min-width: 100vw;
+        min-height: 100vh;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        color: #eee !important;
+    }
+
+    #app,
+    .content {
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+    }
+
+    canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 0;
+    }
+
+    .inputs {
+        background: rgba(0, 0, 0.8);
+        position: fixed;
+        z-index: 1;
+    }
+
+    .dg.ac {
+        position: absolute;
+        z-index: 111;
+    }
+</style>
+
+
+<script type="module" defer>
+
+
+    // import { Stats } from "https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js";
+    var Stats = function () {
+        function e(e) {
+            return n.appendChild(e.dom), e;
+        }
+        function t(e) {
+            for (var t = 0; t < n.children.length; t++) n.children[t].style.display = t === e ? "block" : "none";
+            l = e;
+        }
+        var l = 0,
+            n = document.createElement("div");
+        (n.style.cssText = "position:fixed;top:0;left:0;cursor:pointer;opacity:0.9;z-index:10000"),
+            n.addEventListener(
+                "click",
+                function (e) {
+                    e.preventDefault(), t(++l % n.children.length);
+                },
+                !1
+            );
+        var a = (performance || Date).now(),
+            i = a,
+            o = 0,
+            r = e(new Stats.Panel("FPS", "#0ff", "#002")),
+            f = e(new Stats.Panel("MS", "#0f0", "#020"));
+        if (self.performance && self.performance.memory) var c = e(new Stats.Panel("MB", "#f08", "#201"));
+        return (
+            t(0),
+            {
+                REVISION: 16,
+                dom: n,
+                addPanel: e,
+                showPanel: t,
+                begin: function () {
+                    a = (performance || Date).now();
+                },
+                end: function () {
+                    o++;
+                    var e = (performance || Date).now();
+                    if ((f.update(e - a, 200), e > i + 1e3 && (r.update((1e3 * o) / (e - i), 100), (i = e), (o = 0), c))) {
+                        var t = performance.memory;
+                        c.update(t.usedJSHeapSize / 1048576, t.jsHeapSizeLimit / 1048576);
+                    }
+                    return e;
+                },
+                update: function () {
+                    a = this.end();
+                },
+                domElement: n,
+                setMode: t,
+            }
+        );
+    };
+    (Stats.Panel = function (e, t, l) {
+        var n = 1 / 0,
+            a = 0,
+            i = Math.round,
+            o = i(window.devicePixelRatio || 1),
+            r = 80 * o,
+            f = 48 * o,
+            c = 3 * o,
+            d = 2 * o,
+            p = 3 * o,
+            s = 15 * o,
+            u = 74 * o,
+            m = 30 * o,
+            h = document.createElement("canvas");
+        (h.width = r), (h.height = f), (h.style.cssText = "width:80px;height:48px");
+        var S = h.getContext("2d");
+        return (
+            (S.font = "bold " + 9 * o + "px Helvetica,Arial,sans-serif"),
+            (S.textBaseline = "top"),
+            (S.fillStyle = l),
+            S.fillRect(0, 0, r, f),
+            (S.fillStyle = t),
+            S.fillText(e, c, d),
+            S.fillRect(p, s, u, m),
+            (S.fillStyle = l),
+            (S.globalAlpha = 0.9),
+            S.fillRect(p, s, u, m),
+            {
+                dom: h,
+                update: function (f, v) {
+                    (n = Math.min(n, f)), (a = Math.max(a, f)), (S.fillStyle = l), (S.globalAlpha = 1), S.fillRect(0, 0, r, s), (S.fillStyle = t), S.fillText(i(f) + " " + e + " (" + i(n) + "-" + i(a) + ")", c, d), S.drawImage(h, p + o, s, u - o, m, p, s, u - o, m), S.fillRect(p + u - o, s, o, m), (S.fillStyle = l), (S.globalAlpha = 0.9), S.fillRect(p + u - o, s, o, i((1 - f / v) * m));
+                },
+            }
+        );
+    }),
+        "object" == typeof module && (module.exports = Stats);
+
+        Math.TAU = Math.PI * 2
+
+    // import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
+    import * as THREE from "https://cdn.skypack.dev/three@0.118.3";
+
+    // https://cdn.skypack.dev/three@<version>/examples/jsm/controls/OrbitControls.js
+    import { OrbitControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/OrbitControls.js";
+    import { FirstPersonControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/FirstPersonControls.js";
+    import { PointerLockControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/PointerLockControls.js";
+    import { ConvexGeometry } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/geometries/ConvexGeometry.js";
+
+    import dat from "https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js";
+    
+    var stats = new Stats();
+    stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+    document.body.appendChild(stats.dom);
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(50, 500 / 400, 0.1, 1000);
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    var a_images = [
+        // {
+        //     s_name: "clown", 
+        //     s_description: "clown", 
+        //     s_src: "./1.jpeg"
+        // }, 
+        // {
+        //     s_name: "clown", 
+        //     s_description: "clown", 
+        //     s_src: "./2.jpeg"
+        // },
+        {
+            s_name: "übel", 
+            s_description: "übel", 
+            s_src: "./uebel.jpg"
+        }
+    ]
+    const textureLoader = new THREE.TextureLoader();
+    const fontLoader = new THREE.FontLoader()
+
+    var get_normalized_height_by_latlon_in_radians = function (n_lat_rad, n_lon_rad, o_canvas, a_data) {
+        //n_lat_rad // -tau/4 to tau/4 => y 0 to y 1
+        //n_lon_rad // -tau/2 to tau/2 => x 0 to x 1
+        n_lat_rad = n_lat_rad * -1;
+
+        var n_lat_normalized = (n_lat_rad + Math.TAU / 4) / (Math.TAU / 2);
+        var n_lon_normalized = (n_lon_rad + Math.TAU / 2) / Math.TAU;
+
+        var n_img_coordinate_x = parseInt(o_canvas.width * n_lon_normalized);
+        var n_img_coordinate_y = parseInt(o_canvas.height * n_lat_normalized);
+
+        if (n_img_coordinate_y > 0) {
+            n_img_coordinate_y = n_img_coordinate_y - 1;
+        }
+        var n_pixel_r_start_index = n_img_coordinate_y * o_canvas.width + n_img_coordinate_x;
+        n_pixel_r_start_index = n_pixel_r_start_index * 4; // foreach pixel 4 array values [r,g,b,a,r,g,b,a...]
+
+        var n_index_r = n_pixel_r_start_index;
+        var n_index_g = n_pixel_r_start_index + 1;
+        var n_index_b = n_pixel_r_start_index + 2;
+        var n_index_a = n_pixel_r_start_index + 3;
+
+        // image_data is Uint8ClampedArray
+        var o_pixel_rgba_normalized = {
+            n_r: a_data[n_index_r] / 255,
+            n_g: a_data[n_index_g] / 255,
+            n_b: a_data[n_index_b] / 255,
+            n_a: a_data[n_index_a] / 255,
+        };
+        // unneccessary since the world_height_map is black white anyway, but why not
+        var n_rgb_sum = o_pixel_rgba_normalized.n_r + o_pixel_rgba_normalized.n_g + o_pixel_rgba_normalized.n_b;
+        // o_pixel_rgba_normalized.n_a
+
+        var n_lightness_normalized = n_rgb_sum / 3;
+
+        return n_lightness_normalized;
+    };
+
+    var map_texture_with_height_to_sphere = function(s_src, o_geometry, n_factor){
+
+        var o_img = document.createElement("img");
+        o_img.src = s_src;
+
+        o_img.onload = function () {
+            var o_canvas = document.createElement("canvas");
+            o_canvas.width = o_img.width;
+            o_canvas.height = o_img.height;
+
+            o_canvas.getContext("2d").drawImage(o_img, 0, 0, o_img.width, o_img.height);
+            var a_canvas_data = o_canvas.getContext("2d").getImageData(0, 0, o_canvas.width, o_canvas.height).data;
+            // debugger
+            o_geometry.rotateY( (Math.TAU/4)*3)//
+
+            for (var key in o_geometry.vertices) {
+                // debugger
+                var o_vec3 = o_geometry.vertices[key];
+
+                var o_spherical_coords = new THREE.Spherical().setFromCartesianCoords(
+                    o_vec3.x,
+                    o_vec3.y,
+                    o_vec3.z
+                );
+                
+                var n_lat = o_spherical_coords.phi;
+                var n_lon = o_spherical_coords.theta;
+                n_lat = (n_lat-Math.TAU/4)*-1;
+
+                // o_spherical_coords.radius += (Math.random() -0.5)*0.2;
+                var n_lightness_normalized = get_normalized_height_by_latlon_in_radians(
+                    n_lat,
+                    n_lon,
+                    o_canvas,
+                    a_canvas_data
+                );
+
+                if (!o_vec3.o_spherical_coords_original) {
+                    o_vec3.o_spherical_coords_original = JSON.parse(JSON.stringify(o_spherical_coords));
+                }
+
+                o_spherical_coords.radius = o_spherical_coords.radius + (1-n_lightness_normalized) * n_factor;
+                o_vec3.n_lightness_normalized = n_lightness_normalized;
+
+                var o_vec3_new = new THREE.Vector3().setFromSpherical(o_spherical_coords);
+                
+                o_vec3.copy(o_vec3_new);
+            }
+
+        }
+    }
+
+    textureLoader.load( a_images[0].s_src, function ( texture ) {
+        var n_radius = 20; 
+        var n_width_segments = 128; 
+        var n_height_segments = 128; 
+        
+        let geometry = new THREE.SphereGeometry( 
+            n_radius, 
+            n_width_segments, 
+            n_height_segments
+        );
+
+        var material = new THREE.MeshBasicMaterial( {map:texture} );
+        var mesh = new THREE.Mesh(geometry, material);
+        mesh.material.side = THREE.DoubleSide;
+        scene.add(mesh);
+    })
+
+
+    camera.position.z = 5
+    window.camera = camera
+
+
+    for(var i in a_images){
+        
+        let o_image = a_images[i]; 
+
+        textureLoader.load( o_image.s_src, function ( texture ) {
+            
+            // console.log(texture)
+
+            var n_radius = 1; 
+            var n_width_segments = 64; 
+            var n_height_segments = 64; 
+            
+            let geometry = new THREE.SphereGeometry( 
+                n_radius, 
+                n_width_segments, 
+                n_height_segments
+            );
+
+
+            let material = new THREE.MeshBasicMaterial( 
+                {   
+                    map: texture,
+                }
+            );
+            
+            map_texture_with_height_to_sphere(
+                o_image.s_src,
+                geometry,
+                1
+            )
+
+            let mesh = new THREE.Mesh( 
+                geometry,
+                material
+            );
+            
+            mesh.o_rotation_speed = new THREE.Vector3(
+                // Math.random() * 0.03,
+                0,
+                // Math.random() * 0.03,
+                0,
+                // Math.random() * 0.03
+                0,
+            )  
+
+            // mesh.position.x = Math.random()*5
+            // mesh.position.y = Math.random()*5
+            // mesh.position.z = Math.random()*5
+            
+            scene.add( mesh );
+
+
+            fontLoader.load(
+                "./Montserrat_Regular.json",
+                (font) => {
+                                                //Geometry
+                    const textGeometry = new THREE.TextBufferGeometry(
+                        o_image.s_name,  //Text that you want to display
+                        {
+                            font: font,
+                            size: 0.1,
+                            height: 0.01,
+                        }
+                    )
+
+                    textGeometry.center()  //to center the text at the axis
+                    
+
+                    var matrl = new THREE.MeshPhongMaterial({
+                        color      :  new THREE.Color("rgb(222,22,22)"),
+                    });
+
+                    var font_mesh = new THREE.Mesh( 
+                        textGeometry,
+                        matrl
+                    );
+                    font_mesh.o_rotation_speed = new THREE.Vector3(
+                        0, 
+                        0.01, 
+                        0
+                    )
+                    
+                    // window.font_mesh = font_mesh
+                    font_mesh.position.y = 1.5
+                    font_mesh.name = 'font'
+
+                    scene.add(font_mesh)  //don't forget to add the text to scene
+                }
+            )
+            
+
+        } );
+    }
+
+    const spotLight = new THREE.SpotLight( 0xffffff );
+    spotLight.position.set( 2, 2, 2 );
+
+    spotLight.castShadow = true;
+
+    spotLight.shadow.mapSize.width = 1024;
+    spotLight.shadow.mapSize.height = 1024;
+
+    spotLight.shadow.camera.near = 500;
+    spotLight.shadow.camera.far = 4000;
+    spotLight.shadow.camera.fov = 30;
+
+    scene.add( spotLight );
+
+    // const light = new THREE.AmbientLight( 0x404040 ); // soft white light
+
+    // scene.add( light );
+
+
+    var hidmap = {}; // human interface device map 
+    hidmap["mouse"] = {down:false, x: 0, y: 0}
+    hidmap["last_mouse"] = {down:false, x: 0, y: 0}
+
+    document.body.onmousemove = function(e){
+        hidmap["last_mouse"] =JSON.parse(JSON.stringify(hidmap["mouse"]))
+
+        hidmap["mouse"].x = window.event.clientX;
+        hidmap["mouse"].x_normalized = window.event.clientX / window.innerWidth ;
+        hidmap["mouse"].y = window.event.clientY;
+        hidmap["mouse"].y_normalized = window.event.clientY / window.innerHeight ;
+    }
+    document.body.onmousedown = function(){
+        hidmap["last_mouse"] =JSON.parse(JSON.stringify(hidmap["mouse"]))
+        hidmap["mouse"].down = true
+    }
+    document.body.onmouseup = function(){
+        hidmap["last_mouse"] =JSON.parse(JSON.stringify(hidmap["mouse"]))
+        hidmap["mouse"].down = false
+    }
+
+    document.body.onkeydown = function () {
+        hidmap[window.event.key] = true;
+        // console.log(hidmap)
+    };
+
+    document.body.onkeyup = function () {
+        hidmap[window.event.key] = false;
+        // console.log(hidmap)
+    };
+
+
+    const controls = new PointerLockControls( camera, document.body );
+
+    document.body.addEventListener( 'click', function () {
+        //lock mouse on screen
+        controls.lock();
+
+    }, false );
+
+    var animation_id = 0;
+    var movement_speed = 0.1;
+    var n_t = 0
+    var render = function () {
+        
+        stats.begin();
+        
+        if(hidmap["w"] == true){
+            controls.moveForward(movement_speed)
+        }
+        if(hidmap["s"] == true){
+            controls.moveForward(-movement_speed)
+        }
+        if(hidmap["a"] == true){
+            controls.moveRight(-movement_speed)
+        }
+        if(hidmap["d"] == true){
+            controls.moveRight(movement_speed)
+        }
+        if(hidmap["e"] == true){
+            camera.position.y += (movement_speed)
+        }
+        if(hidmap["q"] == true){
+            camera.position.y -= movement_speed
+        }
+
+        renderer.render(scene, camera);
+
+        for(var i in scene.children){
+            
+            var o_child = scene.children[i]
+            
+            if(o_child.o_rotation_speed){
+                    o_child.rotation.x -= o_child.o_rotation_speed.x
+                    o_child.rotation.y -= o_child.o_rotation_speed.y
+                    o_child.rotation.z -= o_child.o_rotation_speed.z
+            }
+
+            if(o_child.type == "Mesh" && o_child.name != "font"){
+
+
+
+                if(o_child.geometry.vertices[0].o_spherical_coords_original){
+
+                    for (var key in o_child.geometry.vertices) {
+                        // debugger
+                        var o_vec3 = o_child.geometry.vertices[key];
+
+                        var n_new_radius = o_vec3.o_spherical_coords_original.radius + (1-o_vec3.n_lightness_normalized) * hidmap.mouse.y_normalized;
+
+                        var o_vec3_new = new THREE.Vector3().setFromSphericalCoords(
+                            n_new_radius, 
+                            o_vec3.o_spherical_coords_original.phi, 
+                            o_vec3.o_spherical_coords_original.theta
+                            );
+
+                        o_vec3.copy(o_vec3_new);
+
+                    }
+                    o_child.geometry.verticesNeedUpdate = true
+                }
+            }
+        }
+        // console.log(hidmap.mouse.x_normalized)
+
+        // camera.position.x = Math.sin(n_t*0.005) * 10
+        // camera.position.z = Math.cos(n_t*0.005) * 10
+
+        // n_t += (hidmap.mouse.x_normalized - 0.5); 
+
+        spotLight.position.copy(camera.position.copy)
+        // camera.lookAt(new THREE.Vector3(0,0,0))
+        
+        stats.end();
+        animation_id = requestAnimationFrame(render);
+    };
+    window.scene = scene
+    render();
+
+    window.addEventListener(
+        "resize",
+        function () {
+            
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        },
+        false
+    );
+
+</script>
