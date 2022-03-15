@@ -1,16 +1,26 @@
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
-<script type="module" src="https://cdn.space.unibe.ch/JsonToHtml.js"></script>
+<<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]>      <html class="no-js"> <!--<![endif]-->
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Marinas kunst gallerie</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="">
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+        <script type="module" src="https://cdn.space.unibe.ch/JsonToHtml.js"></script>
+        
+        <script src="https://cdn.space.unibe.ch/Fontawesome.js"></script>
+        
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css" />
+        
+        <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js" integrity="sha512-by6gRzSfA6HGshqED4Jnc6n/jJ9ojBvjbEbCvsrLzErlIiWswh1qYfYnvSzZg8SmbqVCk/v0XwlpGzJxIDPILw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
 
-<script src="https://cdn.space.unibe.ch/Fontawesome.js"></script>
-
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.8.0/css/bulma.min.css" />
-
-<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js" integrity="sha512-by6gRzSfA6HGshqED4Jnc6n/jJ9ojBvjbEbCvsrLzErlIiWswh1qYfYnvSzZg8SmbqVCk/v0XwlpGzJxIDPILw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
-
-<div id="app">
-    <canvas id="canvas"></canvas>
-</div>
 
 <style>
     * {
@@ -60,6 +70,17 @@
     }
 </style>
 
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+
+        <div id="app">
+            <canvas id="canvas"></canvas>
+        </div>
+        
+        
 
 <script type="module" defer>
 
@@ -188,8 +209,8 @@
         //     s_src: "./2.jpeg"
         // },
         {
-            s_name: "übel", 
-            s_description: "übel", 
+            s_name: "übel", 
+            s_description: "übel", 
             s_src: "./uebel.jpg"
         }
     ]
@@ -327,7 +348,7 @@
             );
 
 
-            let material = new THREE.MeshBasicMaterial( 
+            var material = new THREE.MeshBasicMaterial( 
                 {   
                     map: texture,
                 }
@@ -368,28 +389,34 @@
                         o_image.s_name,  //Text that you want to display
                         {
                             font: font,
-                            size: 0.1,
-                            height: 0.01,
+                            size: 0.2,
+                            height: 0.1,
                         }
                     )
 
                     textGeometry.center()  //to center the text at the axis
-                    
+                    var texture2 = texture.clone()
+                    texture2.wrapS = THREE.RepeatWrapping;
+                    texture2.wrapT = THREE.RepeatWrapping;
+                    texture2.repeat.set( 10, 10 );
+                    texture2.needsUpdate = true;
 
-                    var matrl = new THREE.MeshPhongMaterial({
-                        color      :  new THREE.Color("rgb(222,22,22)"),
-                    });
+                    var material = new THREE.MeshBasicMaterial( 
+                        {   
+                            map: texture2,
+                        }
+                    );
 
                     var font_mesh = new THREE.Mesh( 
                         textGeometry,
-                        matrl
+                        material
                     );
+
                     font_mesh.o_rotation_speed = new THREE.Vector3(
                         0, 
                         0.01, 
                         0
                     )
-                    
                     // window.font_mesh = font_mesh
                     font_mesh.position.y = 1.5
                     font_mesh.name = 'font'
@@ -402,23 +429,8 @@
         } );
     }
 
-    const spotLight = new THREE.SpotLight( 0xffffff );
-    spotLight.position.set( 2, 2, 2 );
 
-    spotLight.castShadow = true;
 
-    spotLight.shadow.mapSize.width = 1024;
-    spotLight.shadow.mapSize.height = 1024;
-
-    spotLight.shadow.camera.near = 500;
-    spotLight.shadow.camera.far = 4000;
-    spotLight.shadow.camera.fov = 30;
-
-    scene.add( spotLight );
-
-    // const light = new THREE.AmbientLight( 0x404040 ); // soft white light
-
-    // scene.add( light );
 
 
     var hidmap = {}; // human interface device map 
@@ -501,15 +513,13 @@
 
             if(o_child.type == "Mesh" && o_child.name != "font"){
 
-
-
                 if(o_child.geometry.vertices[0].o_spherical_coords_original){
 
                     for (var key in o_child.geometry.vertices) {
                         // debugger
                         var o_vec3 = o_child.geometry.vertices[key];
 
-                        var n_new_radius = o_vec3.o_spherical_coords_original.radius + (1-o_vec3.n_lightness_normalized) * hidmap.mouse.y_normalized;
+                        var n_new_radius = o_vec3.o_spherical_coords_original.radius + (1-o_vec3.n_lightness_normalized) * Math.sin(animation_id*0.01) * 0.2;
 
                         var o_vec3_new = new THREE.Vector3().setFromSphericalCoords(
                             n_new_radius, 
@@ -524,16 +534,7 @@
                 }
             }
         }
-        // console.log(hidmap.mouse.x_normalized)
 
-        // camera.position.x = Math.sin(n_t*0.005) * 10
-        // camera.position.z = Math.cos(n_t*0.005) * 10
-
-        // n_t += (hidmap.mouse.x_normalized - 0.5); 
-
-        spotLight.position.copy(camera.position.copy)
-        // camera.lookAt(new THREE.Vector3(0,0,0))
-        
         stats.end();
         animation_id = requestAnimationFrame(render);
     };
@@ -553,3 +554,9 @@
     );
 
 </script>
+
+        <script src="" async defer></script>
+    </body>
+</html>
+
+
