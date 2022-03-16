@@ -185,6 +185,8 @@
     import { PointerLockControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/PointerLockControls.js";
     import { ConvexGeometry } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/geometries/ConvexGeometry.js";
 
+    import { VRButton } from 'https://cdn.skypack.dev/three@0.118.3/examples/jsm/webxr/VRButton.js';
+    
     import dat from "https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js";
     
     var stats = new Stats();
@@ -197,6 +199,10 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
+    document.body.appendChild( VRButton.createButton( renderer ) );
+    
+    renderer.xr.enabled = true;
+    
     var a_images = [
         // {
         //     s_name: "clown", 
