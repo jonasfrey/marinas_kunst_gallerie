@@ -195,6 +195,18 @@
 
     var scene = new THREE.Scene();
     var camera = new THREE.PerspectiveCamera(50, 500 / 400, 0.1, 1000);
+
+    camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 0.1, 10 );
+    camera.position.set( 0, 1.6, 3 );
+    var container = document.createElement( 'div' );
+	document.body.appendChild( container );
+
+    var controls, group;
+
+    controls = new OrbitControls( camera, container );
+    controls.target.set( 0, 1.6, 0 );
+    controls.update();
+
     var renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
@@ -472,11 +484,11 @@
     };
 
 
-    const controls = new PointerLockControls( camera, document.body );
+    const pointerlockcontrols = new PointerLockControls( camera, document.body );
 
     document.body.addEventListener( 'click', function () {
         //lock mouse on screen
-        controls.lock();
+        pointerlockcontrols.lock();
 
     }, false );
 
@@ -488,16 +500,16 @@
         stats.begin();
         
         if(hidmap["w"] == true){
-            controls.moveForward(movement_speed)
+            pointerlockcontrols.moveForward(movement_speed)
         }
         if(hidmap["s"] == true){
-            controls.moveForward(-movement_speed)
+            pointerlockcontrols.moveForward(-movement_speed)
         }
         if(hidmap["a"] == true){
-            controls.moveRight(-movement_speed)
+            pointerlockcontrols.moveRight(-movement_speed)
         }
         if(hidmap["d"] == true){
-            controls.moveRight(movement_speed)
+            pointerlockcontrols.moveRight(movement_speed)
         }
         if(hidmap["e"] == true){
             camera.position.y += (movement_speed)
