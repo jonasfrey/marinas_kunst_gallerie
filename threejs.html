@@ -84,6 +84,340 @@
 
 <script type="module" defer>
 
+// import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
+import * as THREE from "https://cdn.skypack.dev/three@0.118.3";
+
+// https://cdn.skypack.dev/three@<version>/examples/jsm/controls/OrbitControls.js
+import { OrbitControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/OrbitControls.js";
+import { FirstPersonControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/FirstPersonControls.js";
+import { PointerLockControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/PointerLockControls.js";
+import { ConvexGeometry } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/geometries/ConvexGeometry.js";
+
+import { VRButton } from 'https://cdn.skypack.dev/three@0.118.3/examples/jsm/webxr/VRButton.js';
+
+import dat from "https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js";
+
+
+// Author: Fyrestar https://mevedia.com (https://github.com/Fyrestar/THREE.BufferGeometry-toIndexed)
+THREE.BufferGeometry.prototype.toIndexed = function () {
+
+let list = [], vertices = {};
+
+let _src, attributesKeys, morphKeys;
+
+let prec = 0, precHalf = 0, length = 0;
+
+
+function floor( array, offset ) {
+
+    if ( array instanceof Float32Array ) {
+
+        return Math.floor( array[ offset ] * prec );
+
+    } else if ( array instanceof Float16Array ) {
+
+        return Math.floor( array[ offset ] * precHalf );
+
+    } else {
+
+        return array[ offset ];
+
+    }
+
+}
+
+function createAttribute( src_attribute ) {
+
+    const dst_attribute = new THREE.BufferAttribute( new src_attribute.array.constructor( length * src_attribute.itemSize ), src_attribute.itemSize );
+
+    const dst_array = dst_attribute.array;
+    const src_array = src_attribute.array;
+
+    switch ( src_attribute.itemSize ) {
+        case 1:
+
+            for ( let i = 0, l = list.length; i < l; i++ ) {
+
+                dst_array[ i ] = src_array[ list[ i ] ];
+
+            }
+
+            break;
+        case 2:
+
+            for ( let i = 0, l = list.length; i < l; i++ ) {
+
+                const index = list[ i ] * 2;
+
+                const offset = i * 2;
+
+                dst_array[ offset ] = src_array[ index ];
+                dst_array[ offset + 1 ] = src_array[ index + 1 ];
+
+            }
+
+            break;
+        case 3:
+
+            for ( let i = 0, l = list.length; i < l; i++ ) {
+
+                const index = list[ i ] * 3;
+
+                const offset = i * 3;
+
+                dst_array[ offset ] = src_array[ index ];
+                dst_array[ offset + 1 ] = src_array[ index + 1 ];
+                dst_array[ offset + 2 ] = src_array[ index + 2 ];
+
+
+            }
+
+            break;
+        case 4:
+
+            for ( let i = 0, l = list.length; i < l; i++ ) {
+
+                const index = list[ i ] * 4;
+
+                const offset = i * 4;
+
+                dst_array[ offset ] = src_array[ index ];
+                dst_array[ offset + 1 ] = src_array[ index + 1 ];
+                dst_array[ offset + 2 ] = src_array[ index + 2 ];
+                dst_array[ offset + 3 ] = src_array[ index + 3 ];
+
+
+            }
+
+            break;
+    }
+
+    return dst_attribute;
+
+}
+
+function hashAttribute( attribute, offset ) {
+
+    const array = attribute.array;
+
+    switch ( attribute.itemSize ) {
+        case 1:
+
+            return floor( array, offset );
+
+        case 2:
+
+            return floor( array, offset ) + '_' + floor( array, offset + 1 );
+
+        case 3:
+
+            return floor( array, offset ) + '_' + floor( array, offset + 1 ) + '_' + floor( array, offset + 2 );
+
+        case 4:
+
+            return floor( array, offset ) + '_' + floor( array, offset + 1 ) + '_' + floor( array, offset + 2 ) + '_' + floor( array, offset + 3 );
+
+    }
+
+
+}
+
+
+function store( index, n ) {
+
+    let id = '';
+
+    for ( let i = 0, l = attributesKeys.length; i < l; i++ ) {
+
+        const key = attributesKeys[ i ];
+        const attribute = _src.attributes[ key ];
+
+        const offset = attribute.itemSize * index * 3 + n * attribute.itemSize;
+
+        id += hashAttribute( attribute, offset ) + '_';
+
+    }
+
+    for ( let i = 0, l = morphKeys.length; i < l; i++ ) {
+
+        const key = morphKeys[ i ];
+        const attribute = _src.morphAttributes[ key ];
+
+        const offset = attribute.itemSize * index * 3 + n * attribute.itemSize;
+
+        id += hashAttribute( attribute, offset ) + '_';
+
+    }
+
+
+    if ( vertices[ id ] === undefined ) {
+
+        vertices[ id ] = list.length;
+
+        list.push( index * 3 + n );
+
+    }
+
+    return vertices[ id ];
+
+}
+
+function storeFast( x, y, z, v ) {
+
+
+    const id = Math.floor( x * prec ) + '_' + Math.floor( y * prec ) + '_' + Math.floor( z * prec );
+
+    if ( vertices[ id ] === undefined ) {
+
+        vertices[ id ] = list.length;
+
+
+        list.push( v );
+
+    }
+
+    return vertices[ id ];
+
+}
+
+
+function indexBufferGeometry( src, dst, fullIndex ) {
+
+    _src = src;
+
+    attributesKeys = Object.keys( src.attributes );
+    morphKeys = Object.keys( src.morphAttributes );
+
+
+
+    const position = src.attributes.position.array;
+    const faceCount = position.length / 3 / 3;
+
+    const typedArray = faceCount * 3 > 65536 ? Uint32Array : Uint16Array;
+    const indexArray = new typedArray( faceCount * 3 );
+
+
+    // Full index only connects vertices where all attributes are equal
+
+    if ( fullIndex ) {
+
+        for ( let i = 0, l = faceCount; i < l; i++ ) {
+
+            indexArray[ i * 3 ] = store( i, 0 );
+            indexArray[ i * 3 + 1 ] = store( i, 1 );
+            indexArray[ i * 3 + 2 ] = store( i, 2, );
+
+        }
+
+    } else {
+
+        for ( let i = 0, l = faceCount; i < l; i++ ) {
+
+            const offset = i * 9;
+
+            indexArray[ i * 3 ] = storeFast( position[ offset ], position[ offset + 1 ], position[ offset + 2 ], i * 3 );
+            indexArray[ i * 3 + 1 ] = storeFast( position[ offset + 3 ], position[ offset + 4 ], position[ offset + 5 ], i * 3 + 1 );
+            indexArray[ i * 3 + 2 ] = storeFast( position[ offset + 6 ], position[ offset + 7 ], position[ offset + 8 ], i * 3 + 2 );
+
+        }
+
+    }
+
+
+    // Index
+
+    dst.index = new THREE.BufferAttribute( indexArray, 1 );
+
+    length = list.length;
+
+
+    // Attributes
+
+    for ( let i = 0, l = attributesKeys.length; i < l; i++ ) {
+
+        const key = attributesKeys[ i ];
+
+        dst.attributes[ key ] = createAttribute( src.attributes[ key ] );
+
+    }
+
+    // Morph Attributes
+
+    for ( let i = 0, l = morphKeys.length; i < l; i++ ) {
+
+        const key = morphKeys[ i ];
+
+        dst.morphAttributes[ key ] = createAttribute( src.morphAttributes[ key ] );
+
+    }
+
+
+    if ( src.boundingSphere ) {
+
+        dst.boundingSphere = src.boundingSphere.clone();
+
+    } else {
+
+        dst.boundingSphere = new THREE.Sphere;
+        dst.computeBoundingSphere();
+
+    }
+
+
+    if ( src.boundingBox ) {
+
+        dst.boundingBox = src.boundingBox.clone();
+
+    } else {
+
+        dst.boundingBox = new THREE.Box3;
+        dst.computeBoundingBox();
+
+    }
+
+    
+    // Groups
+
+    const groups = src.groups;
+
+    for ( let i = 0, l = groups.length; i < l; i ++ ) {
+
+        const group = groups[ i ];
+
+        dst.addGroup( group.start, group.count, group.materialIndex );
+
+    }
+
+
+    // Release data
+
+    vertices = {};
+    list = [];
+
+    _src = null;
+    attributesKeys = [];
+    morphKeys = [];
+
+}
+
+
+return function ( fullIndex, precision ) {
+
+    precision = precision || 6;
+
+    prec = Math.pow( 10, precision );
+    precHalf = Math.pow( 10, Math.floor( precision / 2 ) );
+
+    const geometry = new THREE.BufferGeometry;
+
+    indexBufferGeometry( this, geometry, fullIndex === undefined ? true : fullIndex );
+
+
+    return geometry;
+
+}
+
+}();
 
     // import { Stats } from "https://cdnjs.cloudflare.com/ajax/libs/stats.js/16/Stats.min.js";
     var Stats = function () {
@@ -176,27 +510,14 @@
 
         Math.TAU = Math.PI * 2
 
-    // import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
-    import * as THREE from "https://cdn.skypack.dev/three@0.118.3";
 
-    // https://cdn.skypack.dev/three@<version>/examples/jsm/controls/OrbitControls.js
-    import { OrbitControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/OrbitControls.js";
-    import { FirstPersonControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/FirstPersonControls.js";
-    import { PointerLockControls } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/controls/PointerLockControls.js";
-    import { ConvexGeometry } from "https://cdn.skypack.dev/three@0.118.3/examples/jsm/geometries/ConvexGeometry.js";
-
-    import { VRButton } from 'https://cdn.skypack.dev/three@0.118.3/examples/jsm/webxr/VRButton.js';
-    
-    import dat from "https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js";
-    
     var stats = new Stats();
     stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
     document.body.appendChild(stats.dom);
 
     var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera(50, 500 / 400, 0.1, 1000);
 
-    camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 0.1, 10 );
+    var camera = new THREE.PerspectiveCamera( 50, window.innerWidth / window.innerHeight, 0.1, 1000 );
     camera.position.set( 0, 1.6, 3 );
     var container = document.createElement( 'div' );
 	document.body.appendChild( container );
@@ -215,6 +536,8 @@
     
     renderer.xr.enabled = true;
 
+    
+    var n_callback_counter = 0; 
 
     var a_images = [
         // {
@@ -236,7 +559,7 @@
     const textureLoader = new THREE.TextureLoader();
     const fontLoader = new THREE.FontLoader()
 
-    var get_normalized_height_by_latlon_in_radians = function (n_lat_rad, n_lon_rad, o_canvas, a_data) {
+    var get_normalized_pixeldata_by_latlon_in_radians = function (n_lat_rad, n_lon_rad, o_canvas, a_data) {
         //n_lat_rad // -tau/4 to tau/4 => y 0 to y 1
         //n_lon_rad // -tau/2 to tau/2 => x 0 to x 1
         n_lat_rad = n_lat_rad * -1;
@@ -257,7 +580,7 @@
         var n_index_g = n_pixel_r_start_index + 1;
         var n_index_b = n_pixel_r_start_index + 2;
         var n_index_a = n_pixel_r_start_index + 3;
-
+        
         // image_data is Uint8ClampedArray
         var o_pixel_rgba_normalized = {
             n_r: a_data[n_index_r] / 255,
@@ -265,17 +588,16 @@
             n_b: a_data[n_index_b] / 255,
             n_a: a_data[n_index_a] / 255,
         };
-        // unneccessary since the world_height_map is black white anyway, but why not
-        var n_rgb_sum = o_pixel_rgba_normalized.n_r + o_pixel_rgba_normalized.n_g + o_pixel_rgba_normalized.n_b;
-        // o_pixel_rgba_normalized.n_a
 
-        var n_lightness_normalized = n_rgb_sum / 3;
+        return o_pixel_rgba_normalized 
 
-        return n_lightness_normalized;
+
+
     };
 
-    var map_texture_with_height_to_sphere = function(s_src, o_geometry, n_factor){
-
+    var f_get_vertex_pixel_data = function(s_src, o_mesh, n_factor){
+        var o_geometry = o_mesh.geometry
+        n_callback_counter ++
         var o_img = document.createElement("img");
         o_img.src = s_src;
 
@@ -288,10 +610,21 @@
             var a_canvas_data = o_canvas.getContext("2d").getImageData(0, 0, o_canvas.width, o_canvas.height).data;
             // debugger
             o_geometry.rotateY( (Math.TAU/4)*3)//
-
-            for (var key in o_geometry.vertices) {
+            // the threejs Object.userData prop is intended to give the programmer the option
+            // to store custom data, exactly what we need here
+            
+            o_mesh.userData.a_vertex_texture_pixel_rgba = new Float32Array((o_geometry.attributes.position.array.length/3)*4)
+            o_mesh.userData.a_vertex_original_spherical_coordinates_radius_phi_theta = new Float32Array(o_geometry.attributes.position.array.length)
+            var o_geometry_attributes_position_array_key = 0; 
+            var n_a_vertex_texture_pixel_rgba_key = 0; 
+            while( o_geometry_attributes_position_array_key < o_geometry.attributes.position.array.length) {
                 // debugger
-                var o_vec3 = o_geometry.vertices[key];
+
+                var o_vec3 = new THREE.Vector3(
+                    o_geometry.attributes.position.array[o_geometry_attributes_position_array_key+0],
+                    o_geometry.attributes.position.array[o_geometry_attributes_position_array_key+1],
+                    o_geometry.attributes.position.array[o_geometry_attributes_position_array_key+2]
+                )
 
                 var o_spherical_coords = new THREE.Spherical().setFromCartesianCoords(
                     o_vec3.x,
@@ -304,32 +637,51 @@
                 n_lat = (n_lat-Math.TAU/4)*-1;
 
                 // o_spherical_coords.radius += (Math.random() -0.5)*0.2;
-                var n_lightness_normalized = get_normalized_height_by_latlon_in_radians(
+                var o_pixel_rgba_normalized = get_normalized_pixeldata_by_latlon_in_radians(
                     n_lat,
                     n_lon,
                     o_canvas,
                     a_canvas_data
                 );
 
+                // unneccessary since the world_height_map is black white anyway, but why not
+                var n_rgb_sum = o_pixel_rgba_normalized.n_r + o_pixel_rgba_normalized.n_g + o_pixel_rgba_normalized.n_b;
+                // o_pixel_rgba_normalized.n_a
+
+                var n_lightness_normalized = n_rgb_sum / 3;
+
                 if (!o_vec3.o_spherical_coords_original) {
                     o_vec3.o_spherical_coords_original = JSON.parse(JSON.stringify(o_spherical_coords));
                 }
 
+                o_mesh.userData.a_vertex_original_spherical_coordinates_radius_phi_theta[o_geometry_attributes_position_array_key+0] = o_spherical_coords.radius
+                o_mesh.userData.a_vertex_original_spherical_coordinates_radius_phi_theta[o_geometry_attributes_position_array_key+1] = o_spherical_coords.phi
+                o_mesh.userData.a_vertex_original_spherical_coordinates_radius_phi_theta[o_geometry_attributes_position_array_key+2] = o_spherical_coords.theta
+
                 o_spherical_coords.radius = o_spherical_coords.radius + (1-n_lightness_normalized) * n_factor;
                 o_vec3.n_lightness_normalized = n_lightness_normalized;
 
+                o_mesh.userData.a_vertex_texture_pixel_rgba[n_a_vertex_texture_pixel_rgba_key+0] = o_pixel_rgba_normalized.n_r;
+                o_mesh.userData.a_vertex_texture_pixel_rgba[n_a_vertex_texture_pixel_rgba_key+1] = o_pixel_rgba_normalized.n_g;
+                o_mesh.userData.a_vertex_texture_pixel_rgba[n_a_vertex_texture_pixel_rgba_key+2] = o_pixel_rgba_normalized.n_b;
+                o_mesh.userData.a_vertex_texture_pixel_rgba[n_a_vertex_texture_pixel_rgba_key+3] = o_pixel_rgba_normalized.n_a;
+
                 var o_vec3_new = new THREE.Vector3().setFromSpherical(o_spherical_coords);
                 
-                o_vec3.copy(o_vec3_new);
+                o_vec3.copy(o_vec3_new)
+                o_geometry_attributes_position_array_key+=3
+                n_a_vertex_texture_pixel_rgba_key+=4
             }
+            n_callback_counter --
+            
 
         }
     }
-
+    n_callback_counter++
     textureLoader.load( a_images[0].s_src, function ( texture ) {
         var n_radius = 20; 
-        var n_width_segments = 128; 
-        var n_height_segments = 128; 
+        var n_width_segments = 64; 
+        var n_height_segments = 64; 
         
         let geometry = new THREE.SphereGeometry( 
             n_radius, 
@@ -341,24 +693,27 @@
         var mesh = new THREE.Mesh(geometry, material);
         mesh.material.side = THREE.DoubleSide;
         scene.add(mesh);
+        n_callback_counter--
     })
 
 
     camera.position.z = 5
     window.camera = camera
 
-
+    
     for(var i in a_images){
         
         let o_image = a_images[i]; 
-
+        n_callback_counter++
         textureLoader.load( o_image.s_src, function ( texture ) {
             
             // console.log(texture)
 
             var n_radius = 1; 
-            var n_width_segments = 64; 
-            var n_height_segments = 64; 
+            var n_width_segments = 32; 
+            var n_height_segments = 32; 
+            var n_width_segments = 512; 
+            var n_height_segments = 512; 
             
             let geometry = new THREE.SphereGeometry( 
                 n_radius, 
@@ -373,25 +728,33 @@
                 }
             );
             
-            map_texture_with_height_to_sphere(
-                o_image.s_src,
-                geometry,
-                1
-            )
-
             let mesh = new THREE.Mesh( 
                 geometry,
                 material
             );
+
+            mesh.geometry = new THREE.BufferGeometry().fromGeometry(mesh.geometry)
+            mesh.geometry = mesh.geometry.toIndexed()
+
+            f_get_vertex_pixel_data(
+                o_image.s_src,
+                mesh,
+                1
+            )
+
+            // window.meshhead = mesh
             
+            mesh.name = "sphere1"
+            mesh.rotation.x = Math.PI/2*3
             mesh.o_rotation_speed = new THREE.Vector3(
                 // Math.random() * 0.03,
                 0,
                 // Math.random() * 0.03,
+                // 0.005,
                 0,
                 // Math.random() * 0.03
-                0,
-            )  
+                0.005,
+            )
 
             // mesh.position.x = Math.random()*5
             // mesh.position.y = Math.random()*5
@@ -399,7 +762,7 @@
             
             scene.add( mesh );
 
-
+            n_callback_counter++
             fontLoader.load(
                 "./Montserrat_Regular.json",
                 (font) => {
@@ -441,15 +804,14 @@
                     font_mesh.name = 'font'
 
                     scene.add(font_mesh)  //don't forget to add the text to scene
+                    n_callback_counter--
                 }
             )
-            
 
         } );
+        n_callback_counter --
+
     }
-
-
-
 
 
     var hidmap = {}; // human interface device map 
@@ -483,6 +845,20 @@
         // console.log(hidmap)
     };
 
+    var f_callbacks_done = function(){
+        scene.traverse( function( object ) {    
+            
+            // if ( object.isMesh ){
+            //     if(object.name == "sphere1"){
+            //         // debugger
+            //         object.geometry = new THREE.BufferGeometry().fromGeometry(object.geometry)
+            //         // object.geometry = object.geometry.toIndexed()
+            //     }
+            // }
+
+        } );
+
+    }
 
     const pointerlockcontrols = new PointerLockControls( camera, document.body );
 
@@ -495,8 +871,16 @@
     var animation_id = 0;
     var movement_speed = 0.1;
     var n_t = 0
+    var b_callbacks_done_called = false
     var render = function () {
-        
+        // console.log(n_callback_counter)
+        if(
+            b_callbacks_done_called == false && 
+            n_callback_counter == 0){
+                
+                b_callbacks_done_called = true; 
+                f_callbacks_done()
+        }
         stats.begin();
         
         if(hidmap["w"] == true){
@@ -532,31 +916,88 @@
 
             if(o_child.type == "Mesh" && o_child.name != "font"){
 
-                if(o_child.geometry.vertices[0].o_spherical_coords_original){
+                // if(o_child.geometry.vertices[0].o_spherical_coords_original){
 
-                    for (var key in o_child.geometry.vertices) {
-                        // debugger
-                        var o_vec3 = o_child.geometry.vertices[key];
+                //     for (var key in o_child.geometry.vertices) {
+                //         // debugger
+                //         var o_vec3 = o_child.geometry.vertices[key];
 
-                        var n_new_radius = o_vec3.o_spherical_coords_original.radius + (1-o_vec3.n_lightness_normalized) * Math.sin(animation_id*0.01) * 0.2;
+                //         var n_new_radius = o_vec3.o_spherical_coords_original.radius + (1-o_vec3.n_lightness_normalized) * Math.sin(animation_id*0.01) * 0.2;
 
-                        var o_vec3_new = new THREE.Vector3().setFromSphericalCoords(
-                            n_new_radius, 
-                            o_vec3.o_spherical_coords_original.phi, 
-                            o_vec3.o_spherical_coords_original.theta
-                            );
+                //         var o_vec3_new = new THREE.Vector3().setFromSphericalCoords(
+                //             n_new_radius, 
+                //             o_vec3.o_spherical_coords_original.phi, 
+                //             o_vec3.o_spherical_coords_original.theta
+                //             );
 
-                        o_vec3.copy(o_vec3_new);
+                //         o_vec3.copy(o_vec3_new);
 
-                    }
-                    o_child.geometry.verticesNeedUpdate = true
+                //     }
+                //     o_child.geometry.verticesNeedUpdate = true
+                // }
+            }
+
+            if(
+                o_child.name == "sphere1" &&
+                o_child.geometry instanceof THREE.BufferGeometry &&
+                o_child.userData.a_vertex_original_spherical_coordinates_radius_phi_theta 
+                ){
+
+                var o_geometry = o_child.geometry
+                var a_vertices_positions = o_geometry.attributes.position.array
+                var n_vertices_coordinates_key = 0; 
+                var n_vertex_texture_pixel_rgba_key = 0
+                // debugger
+                while(n_vertices_coordinates_key < a_vertices_positions.length){
+                    // debugger
+                    // var n_vertex_index = n_vertices_coordinates_key/3
+                    // debugger
+                    var n_original_radius = o_child.userData.a_vertex_original_spherical_coordinates_radius_phi_theta[n_vertices_coordinates_key]
+                    var n_original_phi = o_child.userData.a_vertex_original_spherical_coordinates_radius_phi_theta[n_vertices_coordinates_key+1]
+                    var n_original_theta = o_child.userData.a_vertex_original_spherical_coordinates_radius_phi_theta[n_vertices_coordinates_key+2]
+                    
+                    var n_r = o_child.userData.a_vertex_texture_pixel_rgba[n_vertex_texture_pixel_rgba_key+0]
+                    var n_g = o_child.userData.a_vertex_texture_pixel_rgba[n_vertex_texture_pixel_rgba_key+1]
+                    var n_b = o_child.userData.a_vertex_texture_pixel_rgba[n_vertex_texture_pixel_rgba_key+2]
+                    var n_a = o_child.userData.a_vertex_texture_pixel_rgba[n_vertex_texture_pixel_rgba_key+3]
+                    var n_rgb_arithmetic_medium = (n_r + n_g + n_b) /3; 
+
+                    var n_new_radius = n_original_radius + (1-n_rgb_arithmetic_medium) * Math.sin(animation_id*0.03) * 0.4;
+
+                    // x=rsinϕcosθ
+                    // y=rsinϕsinθ
+                    // z=rcosϕ
+                    // var o_vec3_new = new THREE.Vector3().setFromSphericalCoords(
+                    //     n_new_radius, 
+                    //     n_original_phi, 
+                    //     n_original_theta
+                    // );
+                    var x = n_new_radius * Math.sin(n_original_phi) * Math.cos(n_original_theta)
+                    var y = n_new_radius * Math.sin(n_original_phi) * Math.sin(n_original_theta)
+                    var z = n_new_radius * Math.cos(n_original_phi) 
+                    // console.log(a_vertices_positions[n_vertices_coordinates_key*3+0])
+                    // if(isNaN(a_vertices_positions[n_vertices_coordinates_key*3+0])){
+                    //     debugger
+                    // }
+                    a_vertices_positions[n_vertices_coordinates_key+0] = x
+                    a_vertices_positions[n_vertices_coordinates_key+1] = y
+                    a_vertices_positions[n_vertices_coordinates_key+2] = z
+                    // console.log(a_vertices_positions[n_vertices_coordinates_key*3+0])
+                    // console.log("---")
+                    n_vertices_coordinates_key+=3 // [x, y, z]
+                    n_vertex_texture_pixel_rgba_key+=4 // [r, g, b, a]
                 }
+                o_geometry.attributes.position.needsUpdate = true;
             }
         }
 
         stats.end();
-        animation_id = requestAnimationFrame(render);
+        animation_id++
+        // animation_id = requestAnimationFrame(render); //not working in vr/xr
+
     };
+    renderer.setAnimationLoop( render );
+
     window.scene = scene
     render();
 
